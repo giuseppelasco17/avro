@@ -76,11 +76,6 @@
     <plugin-tools-javadoc.version>3.5</plugin-tools-javadoc.version>
     <shade-plugin.version>3.2.3</shade-plugin.version>
     <surefire-plugin.version>3.0.0-M4</surefire-plugin.version>
-    <sonar.projectKey>giuseppelasco17:${project.groupId}:${project.artifactId}</sonar.projectKey>
-    <sonar.links.homepage>https://github.com/giuseppelasco17/avro</sonar.links.homepage>
-    <sonar.links.ci>https://travis-ci.org/giuseppelasco17/avro</sonar.links.ci>
-    <sonar.links.scm>https://github.com/giuseppelasco17/avro</sonar.links.scm>
-    <sonar.links.issue>https://github.com/giuseppelasco17/avro/issues</sonar.links.issue>
   </properties>
 
   <modules>

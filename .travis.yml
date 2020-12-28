@@ -1,10 +1,11 @@
+dist: trusty
 language: java
 jdk: 
   - openjdk11
 
 addons:
  sonarcloud:
-  organization: giuseppelasco17
-  token: 7262f06856dd234f131a9965779351060c96de59
+  organization: "giuseppelasco17"
+  token: "7262f06856dd234f131a9965779351060c96de59"
 script: 
   - mvn clean verify sonar:sonar 

@@ -1,0 +1,6 @@
+projectKey=org.apache.avro:avro-toplevel
+serverUrl=http://localhost:9000
+serverVersion=8.3.1.34397
+dashboardUrl=http://localhost:9000/dashboard?id=org.apache.avro%3Aavro-toplevel
+ceTaskId=AXaqWE9eNEVKBlrzTo1-
+ceTaskUrl=http://localhost:9000/api/ce/task?id=AXaqWE9eNEVKBlrzTo1-

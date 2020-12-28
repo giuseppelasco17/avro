@@ -1,0 +1,897 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SchemaCompatibility.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Apache Avro Tests</a> &gt; <a href="../index.html" class="el_bundle">avro</a> &gt; <a href="index.source.html" class="el_package">org.apache.avro</a> &gt; <span class="el_source">SchemaCompatibility.java</span></div><h1>SchemaCompatibility.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.avro;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Evaluate the compatibility between a reader schema and a writer schema. A
+ * reader and a writer schema are declared compatible if all datum instances of
+ * the writer schema can be successfully decoded using the specified reader
+ * schema.
+ */
+<span class="nc bnc" id="L42" title="All 2 branches missed.">public class SchemaCompatibility {</span>
+<span class="nc" id="L43">  private static final Logger LOG = LoggerFactory.getLogger(SchemaCompatibility.class);</span>
+
+  /** Utility class cannot be instantiated. */
+  private SchemaCompatibility() {
+  }
+
+  /** Message to annotate reader/writer schema pairs that are compatible. */
+  public static final String READER_WRITER_COMPATIBLE_MESSAGE = &quot;Reader schema can always successfully decode data written using the writer schema.&quot;;
+
+  /**
+   * Validates that the provided reader schema can be used to decode avro data
+   * written with the provided writer schema.
+   *
+   * @param reader schema to check.
+   * @param writer schema to check.
+   * @return a result object identifying any compatibility errors.
+   */
+  public static SchemaPairCompatibility checkReaderWriterCompatibility(final Schema reader, final Schema writer) {
+<span class="nc" id="L61">    final SchemaCompatibilityResult compatibility = new ReaderWriterCompatibilityChecker().getCompatibility(reader,</span>
+        writer);
+
+    final String message;
+<span class="nc bnc" id="L65" title="All 3 branches missed.">    switch (compatibility.getCompatibility()) {</span>
+    case INCOMPATIBLE: {
+<span class="nc" id="L67">      message = String.format(</span>
+          &quot;Data encoded using writer schema:%n%s%n&quot; + &quot;will or may fail to decode using reader schema:%n%s%n&quot;,
+<span class="nc" id="L69">          writer.toString(true), reader.toString(true));</span>
+<span class="nc" id="L70">      break;</span>
+    }
+    case COMPATIBLE: {
+<span class="nc" id="L73">      message = READER_WRITER_COMPATIBLE_MESSAGE;</span>
+<span class="nc" id="L74">      break;</span>
+    }
+    default:
+<span class="nc" id="L77">      throw new AvroRuntimeException(&quot;Unknown compatibility: &quot; + compatibility);</span>
+    }
+
+<span class="nc" id="L80">    return new SchemaPairCompatibility(compatibility, reader, writer, message);</span>
+  }
+
+  // -----------------------------------------------------------------------------------------------
+
+  /**
+   * Tests the equality of two Avro named schemas.
+   *
+   * &lt;p&gt;
+   * Matching includes reader name aliases.
+   * &lt;/p&gt;
+   *
+   * @param reader Named reader schema.
+   * @param writer Named writer schema.
+   * @return whether the names of the named schemas match or not.
+   */
+  public static boolean schemaNameEquals(final Schema reader, final Schema writer) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">    if (objectsEqual(reader.getName(), writer.getName())) {</span>
+<span class="nc" id="L98">      return true;</span>
+    }
+    // Apply reader aliases:
+<span class="nc" id="L101">    return reader.getAliases().contains(writer.getFullName());</span>
+  }
+
+  /**
+   * Identifies the writer field that corresponds to the specified reader field.
+   *
+   * &lt;p&gt;
+   * Matching includes reader name aliases.
+   * &lt;/p&gt;
+   *
+   * @param writerSchema Schema of the record where to look for the writer field.
+   * @param readerField  Reader field to identify the corresponding writer field
+   *                     of.
+   * @return the writer field, if any does correspond, or None.
+   */
+  public static Field lookupWriterField(final Schema writerSchema, final Field readerField) {
+<span class="nc bnc" id="L117" title="All 4 branches missed.">    assert (writerSchema.getType() == Type.RECORD);</span>
+<span class="nc" id="L118">    final List&lt;Field&gt; writerFields = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L119">    final Field direct = writerSchema.getField(readerField.name());</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    if (direct != null) {</span>
+<span class="nc" id="L121">      writerFields.add(direct);</span>
+    }
+<span class="nc bnc" id="L123" title="All 2 branches missed.">    for (final String readerFieldAliasName : readerField.aliases()) {</span>
+<span class="nc" id="L124">      final Field writerField = writerSchema.getField(readerFieldAliasName);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">      if (writerField != null) {</span>
+<span class="nc" id="L126">        writerFields.add(writerField);</span>
+      }
+<span class="nc" id="L128">    }</span>
+<span class="nc bnc" id="L129" title="All 3 branches missed.">    switch (writerFields.size()) {</span>
+    case 0:
+<span class="nc" id="L131">      return null;</span>
+    case 1:
+<span class="nc" id="L133">      return writerFields.get(0);</span>
+    default: {
+<span class="nc" id="L135">      throw new AvroRuntimeException(String.format(</span>
+          &quot;Reader record field %s matches multiple fields in writer record schema %s&quot;, readerField, writerSchema));
+    }
+    }
+  }
+
+  /**
+   * Reader/writer schema pair that can be used as a key in a hash map.
+   *
+   * This reader/writer pair differentiates Schema objects based on their system
+   * hash code.
+   */
+  private static final class ReaderWriter {
+    private final Schema mReader;
+    private final Schema mWriter;
+
+    /**
+     * Initializes a new reader/writer pair.
+     *
+     * @param reader Reader schema.
+     * @param writer Writer schema.
+     */
+<span class="nc" id="L157">    public ReaderWriter(final Schema reader, final Schema writer) {</span>
+<span class="nc" id="L158">      mReader = reader;</span>
+<span class="nc" id="L159">      mWriter = writer;</span>
+<span class="nc" id="L160">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L165">      return System.identityHashCode(mReader) ^ System.identityHashCode(mWriter);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">      if (!(obj instanceof ReaderWriter)) {</span>
+<span class="nc" id="L172">        return false;</span>
+      }
+<span class="nc" id="L174">      final ReaderWriter that = (ReaderWriter) obj;</span>
+      // Use pointer comparison here:
+<span class="nc bnc" id="L176" title="All 4 branches missed.">      return (this.mReader == that.mReader) &amp;&amp; (this.mWriter == that.mWriter);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+<span class="nc" id="L182">      return String.format(&quot;ReaderWriter{reader:%s, writer:%s}&quot;, mReader, mWriter);</span>
+    }
+  }
+
+  /**
+   * Determines the compatibility of a reader/writer schema pair.
+   *
+   * &lt;p&gt;
+   * Provides memoization to handle recursive schemas.
+   * &lt;/p&gt;
+   */
+<span class="nc bnc" id="L193" title="All 2 branches missed.">  private static final class ReaderWriterCompatibilityChecker {</span>
+    private static final String ROOT_REFERENCE_TOKEN = &quot;&quot;;
+<span class="nc" id="L195">    private final Map&lt;ReaderWriter, SchemaCompatibilityResult&gt; mMemoizeMap = new HashMap&lt;&gt;();</span>
+
+    /**
+     * Reports the compatibility of a reader/writer schema pair.
+     *
+     * &lt;p&gt;
+     * Memoizes the compatibility results.
+     * &lt;/p&gt;
+     *
+     * @param reader Reader schema to test.
+     * @param writer Writer schema to test.
+     * @return the compatibility of the reader/writer schema pair.
+     */
+    public SchemaCompatibilityResult getCompatibility(final Schema reader, final Schema writer) {
+<span class="nc" id="L209">      Deque&lt;String&gt; location = new ArrayDeque&lt;&gt;();</span>
+<span class="nc" id="L210">      return getCompatibility(ROOT_REFERENCE_TOKEN, reader, writer, location);</span>
+    }
+
+    /**
+     * Reports the compatibility of a reader/writer schema pair.
+     * &lt;p&gt;
+     * Memoizes the compatibility results.
+     * &lt;/p&gt;
+     *
+     * @param referenceToken The equivalent JSON pointer reference token
+     *                       representation of the schema node being visited.
+     * @param reader         Reader schema to test.
+     * @param writer         Writer schema to test.
+     * @param location       Stack with which to track the location within the
+     *                       schema.
+     * @return the compatibility of the reader/writer schema pair.
+     */
+    private SchemaCompatibilityResult getCompatibility(String referenceToken, final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc" id="L229">      location.addFirst(referenceToken);</span>
+<span class="nc" id="L230">      LOG.debug(&quot;Checking compatibility of reader {} with writer {}&quot;, reader, writer);</span>
+<span class="nc" id="L231">      final ReaderWriter pair = new ReaderWriter(reader, writer);</span>
+<span class="nc" id="L232">      SchemaCompatibilityResult result = mMemoizeMap.get(pair);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">      if (result != null) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (result.getCompatibility() == SchemaCompatibilityType.RECURSION_IN_PROGRESS) {</span>
+          // Break the recursion here.
+          // schemas are compatible unless proven incompatible:
+<span class="nc" id="L237">          result = SchemaCompatibilityResult.compatible();</span>
+        }
+      } else {
+        // Mark this reader/writer pair as &quot;in progress&quot;:
+<span class="nc" id="L241">        mMemoizeMap.put(pair, SchemaCompatibilityResult.recursionInProgress());</span>
+<span class="nc" id="L242">        result = calculateCompatibility(reader, writer, location);</span>
+<span class="nc" id="L243">        mMemoizeMap.put(pair, result);</span>
+      }
+<span class="nc" id="L245">      location.removeFirst();</span>
+<span class="nc" id="L246">      return result;</span>
+    }
+
+    /**
+     * Calculates the compatibility of a reader/writer schema pair.
+     *
+     * &lt;p&gt;
+     * Relies on external memoization performed by
+     * {@link #getCompatibility(Schema, Schema)}.
+     * &lt;/p&gt;
+     *
+     * @param reader   Reader schema to test.
+     * @param writer   Writer schema to test.
+     * @param location Stack with which to track the location within the schema.
+     * @return the compatibility of the reader/writer schema pair.
+     */
+    private SchemaCompatibilityResult calculateCompatibility(final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc bnc" id="L264" title="All 4 branches missed.">      assert (reader != null);</span>
+<span class="nc bnc" id="L265" title="All 4 branches missed.">      assert (writer != null);</span>
+<span class="nc" id="L266">      SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();</span>
+
+<span class="nc bnc" id="L268" title="All 2 branches missed.">      if (reader.getType() == writer.getType()) {</span>
+<span class="nc bnc" id="L269" title="All 8 branches missed.">        switch (reader.getType()) {</span>
+        case NULL:
+        case BOOLEAN:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case BYTES:
+        case STRING: {
+<span class="nc" id="L278">          return result;</span>
+        }
+        case ARRAY: {
+<span class="nc" id="L281">          return result</span>
+<span class="nc" id="L282">              .mergedWith(getCompatibility(&quot;items&quot;, reader.getElementType(), writer.getElementType(), location));</span>
+        }
+        case MAP: {
+<span class="nc" id="L285">          return result.mergedWith(getCompatibility(&quot;values&quot;, reader.getValueType(), writer.getValueType(), location));</span>
+        }
+        case FIXED: {
+<span class="nc" id="L288">          result = result.mergedWith(checkSchemaNames(reader, writer, location));</span>
+<span class="nc" id="L289">          return result.mergedWith(checkFixedSize(reader, writer, location));</span>
+        }
+        case ENUM: {
+<span class="nc" id="L292">          result = result.mergedWith(checkSchemaNames(reader, writer, location));</span>
+<span class="nc" id="L293">          return result.mergedWith(checkReaderEnumContainsAllWriterEnumSymbols(reader, writer, location));</span>
+        }
+        case RECORD: {
+<span class="nc" id="L296">          result = result.mergedWith(checkSchemaNames(reader, writer, location));</span>
+<span class="nc" id="L297">          return result.mergedWith(checkReaderWriterRecordFields(reader, writer, location));</span>
+        }
+        case UNION: {
+          // Check that each individual branch of the writer union can be decoded:
+<span class="nc" id="L301">          int i = 0;</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">          for (final Schema writerBranch : writer.getTypes()) {</span>
+<span class="nc" id="L303">            location.addFirst(Integer.toString(i));</span>
+<span class="nc" id="L304">            SchemaCompatibilityResult compatibility = getCompatibility(reader, writerBranch);</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            if (compatibility.getCompatibility() == SchemaCompatibilityType.INCOMPATIBLE) {</span>
+<span class="nc" id="L306">              String message = String.format(&quot;reader union lacking writer type: %s&quot;, writerBranch.getType());</span>
+<span class="nc" id="L307">              result = result.mergedWith(SchemaCompatibilityResult.incompatible(</span>
+<span class="nc" id="L308">                  SchemaIncompatibilityType.MISSING_UNION_BRANCH, reader, writer, message, asList(location)));</span>
+            }
+<span class="nc" id="L310">            location.removeFirst();</span>
+<span class="nc" id="L311">            i++;</span>
+<span class="nc" id="L312">          }</span>
+          // Each schema in the writer union can be decoded with the reader:
+<span class="nc" id="L314">          return result;</span>
+        }
+
+        default: {
+<span class="nc" id="L318">          throw new AvroRuntimeException(&quot;Unknown schema type: &quot; + reader.getType());</span>
+        }
+        }
+
+      } else {
+        // Reader and writer have different schema types:
+
+        // Reader compatible with all branches of a writer union is compatible
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (writer.getType() == Schema.Type.UNION) {</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">          for (Schema s : writer.getTypes()) {</span>
+<span class="nc" id="L328">            result = result.mergedWith(getCompatibility(reader, s));</span>
+<span class="nc" id="L329">          }</span>
+<span class="nc" id="L330">          return result;</span>
+        }
+
+<span class="nc bnc" id="L333" title="All 15 branches missed.">        switch (reader.getType()) {</span>
+        case NULL:
+<span class="nc" id="L335">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case BOOLEAN:
+<span class="nc" id="L337">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case INT:
+<span class="nc" id="L339">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case LONG: {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">          return (writer.getType() == Type.INT) ? result : result.mergedWith(typeMismatch(reader, writer, location));</span>
+        }
+        case FLOAT: {
+<span class="nc bnc" id="L344" title="All 4 branches missed.">          return ((writer.getType() == Type.INT) || (writer.getType() == Type.LONG)) ? result</span>
+<span class="nc" id="L345">              : result.mergedWith(typeMismatch(reader, writer, location));</span>
+
+        }
+        case DOUBLE: {
+<span class="nc bnc" id="L349" title="All 6 branches missed.">          return ((writer.getType() == Type.INT) || (writer.getType() == Type.LONG) || (writer.getType() == Type.FLOAT))</span>
+<span class="nc" id="L350">              ? result</span>
+<span class="nc" id="L351">              : result.mergedWith(typeMismatch(reader, writer, location));</span>
+        }
+        case BYTES: {
+<span class="nc bnc" id="L354" title="All 2 branches missed.">          return (writer.getType() == Type.STRING) ? result : result.mergedWith(typeMismatch(reader, writer, location));</span>
+        }
+        case STRING: {
+<span class="nc bnc" id="L357" title="All 2 branches missed.">          return (writer.getType() == Type.BYTES) ? result : result.mergedWith(typeMismatch(reader, writer, location));</span>
+        }
+
+        case ARRAY:
+<span class="nc" id="L361">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case MAP:
+<span class="nc" id="L363">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case FIXED:
+<span class="nc" id="L365">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case ENUM:
+<span class="nc" id="L367">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case RECORD:
+<span class="nc" id="L369">          return result.mergedWith(typeMismatch(reader, writer, location));</span>
+        case UNION: {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">          for (final Schema readerBranch : reader.getTypes()) {</span>
+<span class="nc" id="L372">            SchemaCompatibilityResult compatibility = getCompatibility(readerBranch, writer);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">            if (compatibility.getCompatibility() == SchemaCompatibilityType.COMPATIBLE) {</span>
+<span class="nc" id="L374">              return result;</span>
+            }
+<span class="nc" id="L376">          }</span>
+          // No branch in the reader union has been found compatible with the writer
+          // schema:
+<span class="nc" id="L379">          String message = String.format(&quot;reader union lacking writer type: %s&quot;, writer.getType());</span>
+<span class="nc" id="L380">          return result.mergedWith(SchemaCompatibilityResult</span>
+<span class="nc" id="L381">              .incompatible(SchemaIncompatibilityType.MISSING_UNION_BRANCH, reader, writer, message, asList(location)));</span>
+        }
+
+        default: {
+<span class="nc" id="L385">          throw new AvroRuntimeException(&quot;Unknown schema type: &quot; + reader.getType());</span>
+        }
+        }
+      }
+    }
+
+    private SchemaCompatibilityResult checkReaderWriterRecordFields(final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc" id="L393">      SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();</span>
+<span class="nc" id="L394">      location.addFirst(&quot;fields&quot;);</span>
+      // Check that each field in the reader record can be populated from the writer
+      // record:
+<span class="nc bnc" id="L397" title="All 2 branches missed.">      for (final Field readerField : reader.getFields()) {</span>
+<span class="nc" id="L398">        location.addFirst(Integer.toString(readerField.pos()));</span>
+<span class="nc" id="L399">        final Field writerField = lookupWriterField(writer, readerField);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (writerField == null) {</span>
+          // Reader field does not correspond to any field in the writer record schema, so
+          // the
+          // reader field must have a default value.
+<span class="nc bnc" id="L404" title="All 2 branches missed.">          if (!readerField.hasDefaultValue()) {</span>
+            // reader field has no default value. Check for the enum default value
+<span class="nc bnc" id="L406" title="All 4 branches missed.">            if (readerField.schema().getType() == Type.ENUM &amp;&amp; readerField.schema().getEnumDefault() != null) {</span>
+<span class="nc" id="L407">              result = result.mergedWith(getCompatibility(&quot;type&quot;, readerField.schema(), writer, location));</span>
+            } else {
+<span class="nc" id="L409">              result = result.mergedWith(</span>
+<span class="nc" id="L410">                  SchemaCompatibilityResult.incompatible(SchemaIncompatibilityType.READER_FIELD_MISSING_DEFAULT_VALUE,</span>
+<span class="nc" id="L411">                      reader, writer, readerField.name(), asList(location)));</span>
+            }
+          }
+        } else {
+<span class="nc" id="L415">          result = result.mergedWith(getCompatibility(&quot;type&quot;, readerField.schema(), writerField.schema(), location));</span>
+        }
+        // POP field index
+<span class="nc" id="L418">        location.removeFirst();</span>
+<span class="nc" id="L419">      }</span>
+      // All fields in the reader record can be populated from the writer record:
+      // POP &quot;fields&quot; literal
+<span class="nc" id="L422">      location.removeFirst();</span>
+<span class="nc" id="L423">      return result;</span>
+    }
+
+    private SchemaCompatibilityResult checkReaderEnumContainsAllWriterEnumSymbols(final Schema reader,
+        final Schema writer, final Deque&lt;String&gt; location) {
+<span class="nc" id="L428">      SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();</span>
+<span class="nc" id="L429">      location.addFirst(&quot;symbols&quot;);</span>
+<span class="nc" id="L430">      final Set&lt;String&gt; symbols = new TreeSet&lt;&gt;(writer.getEnumSymbols());</span>
+<span class="nc" id="L431">      symbols.removeAll(reader.getEnumSymbols());</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">      if (!symbols.isEmpty()) {</span>
+<span class="nc bnc" id="L433" title="All 4 branches missed.">        if (reader.getEnumDefault() != null &amp;&amp; reader.getEnumSymbols().contains(reader.getEnumDefault())) {</span>
+<span class="nc" id="L434">          symbols.clear();</span>
+<span class="nc" id="L435">          result = SchemaCompatibilityResult.compatible();</span>
+        } else {
+<span class="nc" id="L437">          result = SchemaCompatibilityResult.incompatible(SchemaIncompatibilityType.MISSING_ENUM_SYMBOLS, reader,</span>
+<span class="nc" id="L438">              writer, symbols.toString(), asList(location));</span>
+        }
+      }
+      // POP &quot;symbols&quot; literal
+<span class="nc" id="L442">      location.removeFirst();</span>
+<span class="nc" id="L443">      return result;</span>
+    }
+
+    private SchemaCompatibilityResult checkFixedSize(final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc" id="L448">      SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();</span>
+<span class="nc" id="L449">      location.addFirst(&quot;size&quot;);</span>
+<span class="nc" id="L450">      int actual = reader.getFixedSize();</span>
+<span class="nc" id="L451">      int expected = writer.getFixedSize();</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">      if (actual != expected) {</span>
+<span class="nc" id="L453">        String message = String.format(&quot;expected: %d, found: %d&quot;, expected, actual);</span>
+<span class="nc" id="L454">        result = SchemaCompatibilityResult.incompatible(SchemaIncompatibilityType.FIXED_SIZE_MISMATCH, reader, writer,</span>
+<span class="nc" id="L455">            message, asList(location));</span>
+      }
+      // POP &quot;size&quot; literal
+<span class="nc" id="L458">      location.removeFirst();</span>
+<span class="nc" id="L459">      return result;</span>
+    }
+
+    private SchemaCompatibilityResult checkSchemaNames(final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc" id="L464">      SchemaCompatibilityResult result = SchemaCompatibilityResult.compatible();</span>
+<span class="nc" id="L465">      location.addFirst(&quot;name&quot;);</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">      if (!schemaNameEquals(reader, writer)) {</span>
+<span class="nc" id="L467">        String message = String.format(&quot;expected: %s&quot;, writer.getFullName());</span>
+<span class="nc" id="L468">        result = SchemaCompatibilityResult.incompatible(SchemaIncompatibilityType.NAME_MISMATCH, reader, writer,</span>
+<span class="nc" id="L469">            message, asList(location));</span>
+      }
+      // POP &quot;name&quot; literal
+<span class="nc" id="L472">      location.removeFirst();</span>
+<span class="nc" id="L473">      return result;</span>
+    }
+
+    private SchemaCompatibilityResult typeMismatch(final Schema reader, final Schema writer,
+        final Deque&lt;String&gt; location) {
+<span class="nc" id="L478">      String message = String.format(&quot;reader type: %s not compatible with writer type: %s&quot;, reader.getType(),</span>
+<span class="nc" id="L479">          writer.getType());</span>
+<span class="nc" id="L480">      return SchemaCompatibilityResult.incompatible(SchemaIncompatibilityType.TYPE_MISMATCH, reader, writer, message,</span>
+<span class="nc" id="L481">          asList(location));</span>
+    }
+  }
+
+  /**
+   * Identifies the type of a schema compatibility result.
+   */
+<span class="nc" id="L488">  public enum SchemaCompatibilityType {</span>
+<span class="nc" id="L489">    COMPATIBLE, INCOMPATIBLE,</span>
+
+    /** Used internally to tag a reader/writer schema pair and prevent recursion. */
+<span class="nc" id="L492">    RECURSION_IN_PROGRESS;</span>
+  }
+
+<span class="nc" id="L495">  public enum SchemaIncompatibilityType {</span>
+<span class="nc" id="L496">    NAME_MISMATCH, FIXED_SIZE_MISMATCH, MISSING_ENUM_SYMBOLS, READER_FIELD_MISSING_DEFAULT_VALUE, TYPE_MISMATCH,</span>
+<span class="nc" id="L497">    MISSING_UNION_BRANCH;</span>
+  }
+
+  /**
+   * Immutable class representing details about a particular schema pair
+   * compatibility check.
+   */
+  public static final class SchemaCompatibilityResult {
+
+    /**
+     * Merges the current {@code SchemaCompatibilityResult} with the supplied result
+     * into a new instance, combining the list of
+     * {@code Incompatibility Incompatibilities} and regressing to the
+     * {@code SchemaCompatibilityType#INCOMPATIBLE INCOMPATIBLE} state if any
+     * incompatibilities are encountered.
+     *
+     * @param toMerge The {@code SchemaCompatibilityResult} to merge with the
+     *                current instance.
+     * @return A {@code SchemaCompatibilityResult} that combines the state of the
+     *         current and supplied instances.
+     */
+    public SchemaCompatibilityResult mergedWith(SchemaCompatibilityResult toMerge) {
+<span class="nc" id="L519">      List&lt;Incompatibility&gt; mergedIncompatibilities = new ArrayList&lt;&gt;(mIncompatibilities);</span>
+<span class="nc" id="L520">      mergedIncompatibilities.addAll(toMerge.getIncompatibilities());</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">      SchemaCompatibilityType compatibilityType = mCompatibilityType == SchemaCompatibilityType.COMPATIBLE</span>
+<span class="nc" id="L522">          ? toMerge.mCompatibilityType</span>
+<span class="nc" id="L523">          : SchemaCompatibilityType.INCOMPATIBLE;</span>
+<span class="nc" id="L524">      return new SchemaCompatibilityResult(compatibilityType, mergedIncompatibilities);</span>
+    }
+
+    private final SchemaCompatibilityType mCompatibilityType;
+    // the below fields are only valid if INCOMPATIBLE
+    private final List&lt;Incompatibility&gt; mIncompatibilities;
+    // cached objects for stateless details
+<span class="nc" id="L531">    private static final SchemaCompatibilityResult COMPATIBLE = new SchemaCompatibilityResult(</span>
+<span class="nc" id="L532">        SchemaCompatibilityType.COMPATIBLE, Collections.emptyList());</span>
+<span class="nc" id="L533">    private static final SchemaCompatibilityResult RECURSION_IN_PROGRESS = new SchemaCompatibilityResult(</span>
+<span class="nc" id="L534">        SchemaCompatibilityType.RECURSION_IN_PROGRESS, Collections.emptyList());</span>
+
+    private SchemaCompatibilityResult(SchemaCompatibilityType compatibilityType,
+<span class="nc" id="L537">        List&lt;Incompatibility&gt; incompatibilities) {</span>
+<span class="nc" id="L538">      this.mCompatibilityType = compatibilityType;</span>
+<span class="nc" id="L539">      this.mIncompatibilities = incompatibilities;</span>
+<span class="nc" id="L540">    }</span>
+
+    /**
+     * Returns a details object representing a compatible schema pair.
+     *
+     * @return a SchemaCompatibilityDetails object with COMPATIBLE
+     *         SchemaCompatibilityType, and no other state.
+     */
+    public static SchemaCompatibilityResult compatible() {
+<span class="nc" id="L549">      return COMPATIBLE;</span>
+    }
+
+    /**
+     * Returns a details object representing a state indicating that recursion is in
+     * progress.
+     *
+     * @return a SchemaCompatibilityDetails object with RECURSION_IN_PROGRESS
+     *         SchemaCompatibilityType, and no other state.
+     */
+    public static SchemaCompatibilityResult recursionInProgress() {
+<span class="nc" id="L560">      return RECURSION_IN_PROGRESS;</span>
+    }
+
+    /**
+     * Returns a details object representing an incompatible schema pair, including
+     * error details.
+     *
+     * @return a SchemaCompatibilityDetails object with INCOMPATIBLE
+     *         SchemaCompatibilityType, and state representing the violating part.
+     */
+    public static SchemaCompatibilityResult incompatible(SchemaIncompatibilityType incompatibilityType,
+        Schema readerFragment, Schema writerFragment, String message, List&lt;String&gt; location) {
+<span class="nc" id="L572">      Incompatibility incompatibility = new Incompatibility(incompatibilityType, readerFragment, writerFragment,</span>
+          message, location);
+<span class="nc" id="L574">      return new SchemaCompatibilityResult(SchemaCompatibilityType.INCOMPATIBLE,</span>
+<span class="nc" id="L575">          Collections.singletonList(incompatibility));</span>
+    }
+
+    /**
+     * Returns the SchemaCompatibilityType, always non-null.
+     *
+     * @return a SchemaCompatibilityType instance, always non-null
+     */
+    public SchemaCompatibilityType getCompatibility() {
+<span class="nc" id="L584">      return mCompatibilityType;</span>
+    }
+
+    /**
+     * If the compatibility is INCOMPATIBLE, returns {@link Incompatibility
+     * Incompatibilities} found, otherwise an empty list.
+     *
+     * @return a list of {@link Incompatibility Incompatibilities}, may be empty,
+     *         never null.
+     */
+    public List&lt;Incompatibility&gt; getIncompatibilities() {
+<span class="nc" id="L595">      return mIncompatibilities;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L601">      final int prime = 31;</span>
+<span class="nc" id="L602">      int result = 1;</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">      result = prime * result + ((mCompatibilityType == null) ? 0 : mCompatibilityType.hashCode());</span>
+<span class="nc bnc" id="L604" title="All 2 branches missed.">      result = prime * result + ((mIncompatibilities == null) ? 0 : mIncompatibilities.hashCode());</span>
+<span class="nc" id="L605">      return result;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L611" title="All 2 branches missed.">      if (this == obj)</span>
+<span class="nc" id="L612">        return true;</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">      if (obj == null)</span>
+<span class="nc" id="L614">        return false;</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">      if (getClass() != obj.getClass())</span>
+<span class="nc" id="L616">        return false;</span>
+<span class="nc" id="L617">      SchemaCompatibilityResult other = (SchemaCompatibilityResult) obj;</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">      if (mIncompatibilities == null) {</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        if (other.mIncompatibilities != null)</span>
+<span class="nc" id="L620">          return false;</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">      } else if (!mIncompatibilities.equals(other.mIncompatibilities))</span>
+<span class="nc" id="L622">        return false;</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">      return mCompatibilityType == other.mCompatibilityType;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+<span class="nc" id="L629">      return String.format(&quot;SchemaCompatibilityResult{compatibility:%s, incompatibilities:%s}&quot;, mCompatibilityType,</span>
+          mIncompatibilities);
+    }
+  }
+  // -----------------------------------------------------------------------------------------------
+
+  public static final class Incompatibility {
+    private final SchemaIncompatibilityType mType;
+    private final Schema mReaderFragment;
+    private final Schema mWriterFragment;
+    private final String mMessage;
+    private final List&lt;String&gt; mLocation;
+
+    Incompatibility(SchemaIncompatibilityType type, Schema readerFragment, Schema writerFragment, String message,
+        List&lt;String&gt; location) {
+<span class="nc" id="L644">      super();</span>
+<span class="nc" id="L645">      this.mType = type;</span>
+<span class="nc" id="L646">      this.mReaderFragment = readerFragment;</span>
+<span class="nc" id="L647">      this.mWriterFragment = writerFragment;</span>
+<span class="nc" id="L648">      this.mMessage = message;</span>
+<span class="nc" id="L649">      this.mLocation = location;</span>
+<span class="nc" id="L650">    }</span>
+
+    /**
+     * Returns the SchemaIncompatibilityType.
+     *
+     * @return a SchemaIncompatibilityType instance.
+     */
+    public SchemaIncompatibilityType getType() {
+<span class="nc" id="L658">      return mType;</span>
+    }
+
+    /**
+     * Returns the fragment of the reader schema that failed compatibility check.
+     *
+     * @return a Schema instance (fragment of the reader schema).
+     */
+    public Schema getReaderFragment() {
+<span class="nc" id="L667">      return mReaderFragment;</span>
+    }
+
+    /**
+     * Returns the fragment of the writer schema that failed compatibility check.
+     *
+     * @return a Schema instance (fragment of the writer schema).
+     */
+    public Schema getWriterFragment() {
+<span class="nc" id="L676">      return mWriterFragment;</span>
+    }
+
+    /**
+     * Returns a human-readable message with more details about what failed. Syntax
+     * depends on the SchemaIncompatibilityType.
+     *
+     * @see #getType()
+     * @return a String with details about the incompatibility.
+     */
+    public String getMessage() {
+<span class="nc" id="L687">      return mMessage;</span>
+    }
+
+    /**
+     * Returns a
+     * &lt;a href=&quot;https://tools.ietf.org/html/draft-ietf-appsawg-json-pointer-08&quot;&gt;JSON
+     * Pointer&lt;/a&gt; describing the node location within the schema's JSON document
+     * tree where the incompatibility was encountered.
+     *
+     * @return JSON Pointer encoded as a string.
+     */
+    public String getLocation() {
+<span class="nc" id="L699">      StringBuilder s = new StringBuilder(&quot;/&quot;);</span>
+<span class="nc" id="L700">      boolean first = true;</span>
+      // ignore root element
+<span class="nc bnc" id="L702" title="All 2 branches missed.">      for (String coordinate : mLocation.subList(1, mLocation.size())) {</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        if (first) {</span>
+<span class="nc" id="L704">          first = false;</span>
+        } else {
+<span class="nc" id="L706">          s.append('/');</span>
+        }
+        // Apply JSON pointer escaping.
+<span class="nc" id="L709">        s.append(coordinate.replace(&quot;~&quot;, &quot;~0&quot;).replace(&quot;/&quot;, &quot;~1&quot;));</span>
+<span class="nc" id="L710">      }</span>
+<span class="nc" id="L711">      return s.toString();</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L717">      final int prime = 31;</span>
+<span class="nc" id="L718">      int result = 1;</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">      result = prime * result + ((mType == null) ? 0 : mType.hashCode());</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">      result = prime * result + ((mReaderFragment == null) ? 0 : mReaderFragment.hashCode());</span>
+<span class="nc bnc" id="L721" title="All 2 branches missed.">      result = prime * result + ((mWriterFragment == null) ? 0 : mWriterFragment.hashCode());</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">      result = prime * result + ((mMessage == null) ? 0 : mMessage.hashCode());</span>
+<span class="nc bnc" id="L723" title="All 2 branches missed.">      result = prime * result + ((mLocation == null) ? 0 : mLocation.hashCode());</span>
+<span class="nc" id="L724">      return result;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L730" title="All 2 branches missed.">      if (this == obj) {</span>
+<span class="nc" id="L731">        return true;</span>
+      }
+<span class="nc bnc" id="L733" title="All 2 branches missed.">      if (obj == null) {</span>
+<span class="nc" id="L734">        return false;</span>
+      }
+<span class="nc bnc" id="L736" title="All 2 branches missed.">      if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L737">        return false;</span>
+      }
+<span class="nc" id="L739">      Incompatibility other = (Incompatibility) obj;</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">      if (mType != other.mType) {</span>
+<span class="nc" id="L741">        return false;</span>
+      }
+<span class="nc bnc" id="L743" title="All 2 branches missed.">      if (mReaderFragment == null) {</span>
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        if (other.mReaderFragment != null) {</span>
+<span class="nc" id="L745">          return false;</span>
+        }
+<span class="nc bnc" id="L747" title="All 2 branches missed.">      } else if (!mReaderFragment.equals(other.mReaderFragment)) {</span>
+<span class="nc" id="L748">        return false;</span>
+      }
+<span class="nc bnc" id="L750" title="All 2 branches missed.">      if (mWriterFragment == null) {</span>
+<span class="nc bnc" id="L751" title="All 2 branches missed.">        if (other.mWriterFragment != null) {</span>
+<span class="nc" id="L752">          return false;</span>
+        }
+<span class="nc bnc" id="L754" title="All 2 branches missed.">      } else if (!mWriterFragment.equals(other.mWriterFragment)) {</span>
+<span class="nc" id="L755">        return false;</span>
+      }
+<span class="nc bnc" id="L757" title="All 2 branches missed.">      if (mMessage == null) {</span>
+<span class="nc bnc" id="L758" title="All 2 branches missed.">        if (other.mMessage != null) {</span>
+<span class="nc" id="L759">          return false;</span>
+        }
+<span class="nc bnc" id="L761" title="All 2 branches missed.">      } else if (!mMessage.equals(other.mMessage)) {</span>
+<span class="nc" id="L762">        return false;</span>
+      }
+<span class="nc bnc" id="L764" title="All 2 branches missed.">      if (mLocation == null) {</span>
+<span class="nc bnc" id="L765" title="All 2 branches missed.">        return other.mLocation == null;</span>
+      } else
+<span class="nc" id="L767">        return mLocation.equals(other.mLocation);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+<span class="nc" id="L773">      return String.format(&quot;Incompatibility{type:%s, location:%s, message:%s, reader:%s, writer:%s}&quot;, mType,</span>
+<span class="nc" id="L774">          getLocation(), mMessage, mReaderFragment, mWriterFragment);</span>
+    }
+  }
+  // -----------------------------------------------------------------------------------------------
+
+  /**
+   * Provides information about the compatibility of a single reader and writer
+   * schema pair.
+   *
+   * Note: This class represents a one-way relationship from the reader to the
+   * writer schema.
+   */
+  public static final class SchemaPairCompatibility {
+    /** The details of this result. */
+    private final SchemaCompatibilityResult mResult;
+
+    /** Validated reader schema. */
+    private final Schema mReader;
+
+    /** Validated writer schema. */
+    private final Schema mWriter;
+
+    /** Human readable description of this result. */
+    private final String mDescription;
+
+    /**
+     * Constructs a new instance.
+     *
+     * @param result      The result of the compatibility check.
+     * @param reader      schema that was validated.
+     * @param writer      schema that was validated.
+     * @param description of this compatibility result.
+     */
+<span class="nc" id="L807">    public SchemaPairCompatibility(SchemaCompatibilityResult result, Schema reader, Schema writer, String description) {</span>
+<span class="nc" id="L808">      mResult = result;</span>
+<span class="nc" id="L809">      mReader = reader;</span>
+<span class="nc" id="L810">      mWriter = writer;</span>
+<span class="nc" id="L811">      mDescription = description;</span>
+<span class="nc" id="L812">    }</span>
+
+    /**
+     * Gets the type of this result.
+     *
+     * @return the type of this result.
+     */
+    public SchemaCompatibilityType getType() {
+<span class="nc" id="L820">      return mResult.getCompatibility();</span>
+    }
+
+    /**
+     * Gets more details about the compatibility, in particular if getType() is
+     * INCOMPATIBLE.
+     *
+     * @return the details of this compatibility check.
+     */
+    public SchemaCompatibilityResult getResult() {
+<span class="nc" id="L830">      return mResult;</span>
+    }
+
+    /**
+     * Gets the reader schema that was validated.
+     *
+     * @return reader schema that was validated.
+     */
+    public Schema getReader() {
+<span class="nc" id="L839">      return mReader;</span>
+    }
+
+    /**
+     * Gets the writer schema that was validated.
+     *
+     * @return writer schema that was validated.
+     */
+    public Schema getWriter() {
+<span class="nc" id="L848">      return mWriter;</span>
+    }
+
+    /**
+     * Gets a human readable description of this validation result.
+     *
+     * @return a human readable description of this validation result.
+     */
+    public String getDescription() {
+<span class="nc" id="L857">      return mDescription;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+<span class="nc" id="L863">      return String.format(&quot;SchemaPairCompatibility{result:%s, readerSchema:%s, writerSchema:%s, description:%s}&quot;,</span>
+          mResult, mReader, mWriter, mDescription);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L870" title="All 2 branches missed.">      if ((other instanceof SchemaPairCompatibility)) {</span>
+<span class="nc" id="L871">        final SchemaPairCompatibility result = (SchemaPairCompatibility) other;</span>
+<span class="nc bnc" id="L872" title="All 4 branches missed.">        return objectsEqual(result.mResult, mResult) &amp;&amp; objectsEqual(result.mReader, mReader)</span>
+<span class="nc bnc" id="L873" title="All 4 branches missed.">            &amp;&amp; objectsEqual(result.mWriter, mWriter) &amp;&amp; objectsEqual(result.mDescription, mDescription);</span>
+      } else {
+<span class="nc" id="L875">        return false;</span>
+      }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L882">      return Arrays.hashCode(new Object[] { mResult, mReader, mWriter, mDescription });</span>
+    }
+  }
+
+  /** Borrowed from Guava's Objects.equal(a, b) */
+  private static boolean objectsEqual(Object obj1, Object obj2) {
+<span class="nc" id="L888">    return Objects.equals(obj1, obj2);</span>
+  }
+
+  private static List&lt;String&gt; asList(Deque&lt;String&gt; deque) {
+<span class="nc" id="L892">    List&lt;String&gt; list = new ArrayList&lt;&gt;(deque);</span>
+<span class="nc" id="L893">    Collections.reverse(list);</span>
+<span class="nc" id="L894">    return Collections.unmodifiableList(list);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>
