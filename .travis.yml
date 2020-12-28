@@ -5,6 +5,6 @@ jdk:
 addons:
  sonarcloud:
   organization: giuseppelasco17
-  token: 67f8f1c3807eb38cf37c81bdd4f94338c6929ec6
+  token: 7262f06856dd234f131a9965779351060c96de59
 script: 
   - mvn clean verify sonar:sonar 
