@@ -58,15 +58,13 @@
     <rat.version>0.13</rat.version>
     <source-plugin.version>3.2.1</source-plugin.version>
     <spotless-maven-plugin.version>1.31.1</spotless-maven-plugin.version>
-    <!--<sonar.projectKey>giuseppelasco17:${project.groupId}:${project.artifactId}</sonar.projectKey>-->
+    <sonar.projectKey>giuseppelasco17:${project.groupId}:${project.artifactId}</sonar.projectKey>
     <sonar.links.homepage>https://github.com/giuseppelasco17/avro</sonar.links.homepage>
     <sonar.links.ci>https://travis-ci.org/giuseppelasco17/avro</sonar.links.ci>
     <sonar.links.scm>https://github.com/giuseppelasco17/avro</sonar.links.scm>
     <sonar.links.issue>https://github.com/giuseppelasco17/avro/issues</sonar.links.issue>
     <sonar.organization>giuseppelasco17</sonar.organization>
 	<sonar.host.url>https://sonarcloud.io</sonar.host.url>
-	<sonar.projectKey>giuseppelasco17_avro</sonar.projectKey>
-	<sonar.moduleKey>{project.groupId}:{project.artifactId}</sonar.moduleKey>
   </properties>
 
   <modules>
