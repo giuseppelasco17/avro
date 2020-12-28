@@ -1,0 +1,10 @@
+language: java
+jdk: 
+  - openjdk11
+
+addons:
+ sonarcloud:
+  organization: giuseppelasco17
+  token: 55e8fc1dc09155547ad409cc3c411a34c0ce7224
+script: 
+  - mvn clean verify sonar:sonar 

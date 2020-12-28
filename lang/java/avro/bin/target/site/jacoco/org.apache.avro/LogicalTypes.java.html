@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LogicalTypes.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache Avro</a> &gt; <a href="index.source.html" class="el_package">org.apache.avro</a> &gt; <span class="el_source">LogicalTypes.java</span></div><h1>LogicalTypes.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.avro;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+<span class="nc" id="L28">public class LogicalTypes {</span>
+
+<span class="nc" id="L30">  private static final Logger LOG = LoggerFactory.getLogger(LogicalTypes.class);</span>
+
+  public interface LogicalTypeFactory {
+    LogicalType fromSchema(Schema schema);
+
+    default String getTypeName() {
+<span class="nc" id="L36">      throw new UnsupportedOperationException();</span>
+    }
+  }
+
+<span class="nc" id="L40">  private static final Map&lt;String, LogicalTypeFactory&gt; REGISTERED_TYPES = new ConcurrentHashMap&lt;&gt;();</span>
+
+  /**
+   * Register a logical type.
+   *
+   * @param logicalTypeName The logical type name
+   * @param factory         The logical type factory
+   *
+   * @throws NullPointerException if {@code logicalTypeName} or {@code factory} is
+   *                              {@code null}
+   */
+  public static void register(String logicalTypeName, LogicalTypeFactory factory) {
+<span class="nc" id="L52">    Objects.requireNonNull(logicalTypeName, &quot;Logical type name cannot be null&quot;);</span>
+<span class="nc" id="L53">    Objects.requireNonNull(factory, &quot;Logical type factory cannot be null&quot;);</span>
+<span class="nc" id="L54">    REGISTERED_TYPES.put(logicalTypeName, factory);</span>
+<span class="nc" id="L55">  }</span>
+
+  /**
+   * Returns the {@link LogicalType} from the schema, if one is present.
+   */
+  public static LogicalType fromSchema(Schema schema) {
+<span class="nc" id="L61">    return fromSchemaImpl(schema, true);</span>
+  }
+
+  public static LogicalType fromSchemaIgnoreInvalid(Schema schema) {
+<span class="nc" id="L65">    return fromSchemaImpl(schema, false);</span>
+  }
+
+  private static LogicalType fromSchemaImpl(Schema schema, boolean throwErrors) {
+    final LogicalType logicalType;
+<span class="nc" id="L70">    final String typeName = schema.getProp(LogicalType.LOGICAL_TYPE_PROP);</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">    if (typeName == null) {</span>
+<span class="nc" id="L73">      return null;</span>
+    }
+
+    try {
+<span class="nc bnc" id="L77" title="All 10 branches missed.">      switch (typeName) {</span>
+      case TIMESTAMP_MILLIS:
+<span class="nc" id="L79">        logicalType = TIMESTAMP_MILLIS_TYPE;</span>
+<span class="nc" id="L80">        break;</span>
+      case DECIMAL:
+<span class="nc" id="L82">        logicalType = new Decimal(schema);</span>
+<span class="nc" id="L83">        break;</span>
+      case UUID:
+<span class="nc" id="L85">        logicalType = UUID_TYPE;</span>
+<span class="nc" id="L86">        break;</span>
+      case DATE:
+<span class="nc" id="L88">        logicalType = DATE_TYPE;</span>
+<span class="nc" id="L89">        break;</span>
+      case TIMESTAMP_MICROS:
+<span class="nc" id="L91">        logicalType = TIMESTAMP_MICROS_TYPE;</span>
+<span class="nc" id="L92">        break;</span>
+      case TIME_MILLIS:
+<span class="nc" id="L94">        logicalType = TIME_MILLIS_TYPE;</span>
+<span class="nc" id="L95">        break;</span>
+      case TIME_MICROS:
+<span class="nc" id="L97">        logicalType = TIME_MICROS_TYPE;</span>
+<span class="nc" id="L98">        break;</span>
+      case LOCAL_TIMESTAMP_MICROS:
+<span class="nc" id="L100">        logicalType = LOCAL_TIMESTAMP_MICROS_TYPE;</span>
+<span class="nc" id="L101">        break;</span>
+      case LOCAL_TIMESTAMP_MILLIS:
+<span class="nc" id="L103">        logicalType = LOCAL_TIMESTAMP_MILLIS_TYPE;</span>
+<span class="nc" id="L104">        break;</span>
+      default:
+<span class="nc" id="L106">        final LogicalTypeFactory typeFactory = REGISTERED_TYPES.get(typeName);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        logicalType = (typeFactory == null) ? null : typeFactory.fromSchema(schema);</span>
+        break;
+      }
+
+      // make sure the type is valid before returning it
+<span class="nc bnc" id="L112" title="All 2 branches missed.">      if (logicalType != null) {</span>
+<span class="nc" id="L113">        logicalType.validate(schema);</span>
+      }
+<span class="nc" id="L115">    } catch (RuntimeException e) {</span>
+<span class="nc" id="L116">      LOG.debug(&quot;Invalid logical type found&quot;, e);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">      if (throwErrors) {</span>
+<span class="nc" id="L118">        throw e;</span>
+      }
+<span class="nc" id="L120">      LOG.warn(&quot;Ignoring invalid logical type for name: {}&quot;, typeName);</span>
+      // ignore invalid types
+<span class="nc" id="L122">      return null;</span>
+<span class="nc" id="L123">    }</span>
+
+<span class="nc" id="L125">    return logicalType;</span>
+  }
+
+  private static final String DECIMAL = &quot;decimal&quot;;
+  private static final String UUID = &quot;uuid&quot;;
+  private static final String DATE = &quot;date&quot;;
+  private static final String TIME_MILLIS = &quot;time-millis&quot;;
+  private static final String TIME_MICROS = &quot;time-micros&quot;;
+  private static final String TIMESTAMP_MILLIS = &quot;timestamp-millis&quot;;
+  private static final String TIMESTAMP_MICROS = &quot;timestamp-micros&quot;;
+  private static final String LOCAL_TIMESTAMP_MILLIS = &quot;local-timestamp-millis&quot;;
+  private static final String LOCAL_TIMESTAMP_MICROS = &quot;local-timestamp-micros&quot;;
+
+  /** Create a Decimal LogicalType with the given precision and scale 0 */
+  public static Decimal decimal(int precision) {
+<span class="nc" id="L140">    return decimal(precision, 0);</span>
+  }
+
+  /** Create a Decimal LogicalType with the given precision and scale */
+  public static Decimal decimal(int precision, int scale) {
+<span class="nc" id="L145">    return new Decimal(precision, scale);</span>
+  }
+
+<span class="nc" id="L148">  private static final LogicalType UUID_TYPE = new LogicalType(&quot;uuid&quot;);</span>
+
+  public static LogicalType uuid() {
+<span class="nc" id="L151">    return UUID_TYPE;</span>
+  }
+
+<span class="nc" id="L154">  private static final Date DATE_TYPE = new Date();</span>
+
+  public static Date date() {
+<span class="nc" id="L157">    return DATE_TYPE;</span>
+  }
+
+<span class="nc" id="L160">  private static final TimeMillis TIME_MILLIS_TYPE = new TimeMillis();</span>
+
+  public static TimeMillis timeMillis() {
+<span class="nc" id="L163">    return TIME_MILLIS_TYPE;</span>
+  }
+
+<span class="nc" id="L166">  private static final TimeMicros TIME_MICROS_TYPE = new TimeMicros();</span>
+
+  public static TimeMicros timeMicros() {
+<span class="nc" id="L169">    return TIME_MICROS_TYPE;</span>
+  }
+
+<span class="nc" id="L172">  private static final TimestampMillis TIMESTAMP_MILLIS_TYPE = new TimestampMillis();</span>
+
+  public static TimestampMillis timestampMillis() {
+<span class="nc" id="L175">    return TIMESTAMP_MILLIS_TYPE;</span>
+  }
+
+<span class="nc" id="L178">  private static final TimestampMicros TIMESTAMP_MICROS_TYPE = new TimestampMicros();</span>
+
+  public static TimestampMicros timestampMicros() {
+<span class="nc" id="L181">    return TIMESTAMP_MICROS_TYPE;</span>
+  }
+
+<span class="nc" id="L184">  private static final LocalTimestampMillis LOCAL_TIMESTAMP_MILLIS_TYPE = new LocalTimestampMillis();</span>
+
+  public static LocalTimestampMillis localTimestampMillis() {
+<span class="nc" id="L187">    return LOCAL_TIMESTAMP_MILLIS_TYPE;</span>
+  }
+
+<span class="nc" id="L190">  private static final LocalTimestampMicros LOCAL_TIMESTAMP_MICROS_TYPE = new LocalTimestampMicros();</span>
+
+  public static LocalTimestampMicros localTimestampMicros() {
+<span class="nc" id="L193">    return LOCAL_TIMESTAMP_MICROS_TYPE;</span>
+  }
+
+  /** Decimal represents arbitrary-precision fixed-scale decimal numbers */
+  public static class Decimal extends LogicalType {
+    private static final String PRECISION_PROP = &quot;precision&quot;;
+    private static final String SCALE_PROP = &quot;scale&quot;;
+
+    private final int precision;
+    private final int scale;
+
+    private Decimal(int precision, int scale) {
+<span class="nc" id="L205">      super(DECIMAL);</span>
+<span class="nc" id="L206">      this.precision = precision;</span>
+<span class="nc" id="L207">      this.scale = scale;</span>
+<span class="nc" id="L208">    }</span>
+
+    private Decimal(Schema schema) {
+<span class="nc" id="L211">      super(&quot;decimal&quot;);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">      if (!hasProperty(schema, PRECISION_PROP)) {</span>
+<span class="nc" id="L213">        throw new IllegalArgumentException(&quot;Invalid decimal: missing precision&quot;);</span>
+      }
+
+<span class="nc" id="L216">      this.precision = getInt(schema, PRECISION_PROP);</span>
+
+<span class="nc bnc" id="L218" title="All 2 branches missed.">      if (hasProperty(schema, SCALE_PROP)) {</span>
+<span class="nc" id="L219">        this.scale = getInt(schema, SCALE_PROP);</span>
+      } else {
+<span class="nc" id="L221">        this.scale = 0;</span>
+      }
+<span class="nc" id="L223">    }</span>
+
+    @Override
+    public Schema addToSchema(Schema schema) {
+<span class="nc" id="L227">      super.addToSchema(schema);</span>
+<span class="nc" id="L228">      schema.addProp(PRECISION_PROP, precision);</span>
+<span class="nc" id="L229">      schema.addProp(SCALE_PROP, scale);</span>
+<span class="nc" id="L230">      return schema;</span>
+    }
+
+    public int getPrecision() {
+<span class="nc" id="L234">      return precision;</span>
+    }
+
+    public int getScale() {
+<span class="nc" id="L238">      return scale;</span>
+    }
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L243">      super.validate(schema);</span>
+      // validate the type
+<span class="nc bnc" id="L245" title="All 4 branches missed.">      if (schema.getType() != Schema.Type.FIXED &amp;&amp; schema.getType() != Schema.Type.BYTES) {</span>
+<span class="nc" id="L246">        throw new IllegalArgumentException(&quot;Logical type decimal must be backed by fixed or bytes&quot;);</span>
+      }
+<span class="nc bnc" id="L248" title="All 2 branches missed.">      if (precision &lt;= 0) {</span>
+<span class="nc" id="L249">        throw new IllegalArgumentException(&quot;Invalid decimal precision: &quot; + precision + &quot; (must be positive)&quot;);</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">      } else if (precision &gt; maxPrecision(schema)) {</span>
+<span class="nc" id="L251">        throw new IllegalArgumentException(&quot;fixed(&quot; + schema.getFixedSize() + &quot;) cannot store &quot; + precision</span>
+<span class="nc" id="L252">            + &quot; digits (max &quot; + maxPrecision(schema) + &quot;)&quot;);</span>
+      }
+<span class="nc bnc" id="L254" title="All 2 branches missed.">      if (scale &lt; 0) {</span>
+<span class="nc" id="L255">        throw new IllegalArgumentException(&quot;Invalid decimal scale: &quot; + scale + &quot; (must be positive)&quot;);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">      } else if (scale &gt; precision) {</span>
+<span class="nc" id="L257">        throw new IllegalArgumentException(</span>
+            &quot;Invalid decimal scale: &quot; + scale + &quot; (greater than precision: &quot; + precision + &quot;)&quot;);
+      }
+<span class="nc" id="L260">    }</span>
+
+    private long maxPrecision(Schema schema) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">      if (schema.getType() == Schema.Type.BYTES) {</span>
+        // not bounded
+<span class="nc" id="L265">        return Integer.MAX_VALUE;</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">      } else if (schema.getType() == Schema.Type.FIXED) {</span>
+<span class="nc" id="L267">        int size = schema.getFixedSize();</span>
+<span class="nc" id="L268">        return Math.round(Math.floor(Math.log10(2) * (8 * size - 1)));</span>
+      } else {
+        // not valid for any other type
+<span class="nc" id="L271">        return 0;</span>
+      }
+    }
+
+    private boolean hasProperty(Schema schema, String name) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">      return (schema.getObjectProp(name) != null);</span>
+    }
+
+    private int getInt(Schema schema, String name) {
+<span class="nc" id="L280">      Object obj = schema.getObjectProp(name);</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">      if (obj instanceof Integer) {</span>
+<span class="nc" id="L282">        return (Integer) obj;</span>
+      }
+<span class="nc" id="L284">      throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">          &quot;Expected int &quot; + name + &quot;: &quot; + (obj == null ? &quot;null&quot; : obj + &quot;:&quot; + obj.getClass().getSimpleName()));</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">      if (this == o)</span>
+<span class="nc" id="L291">        return true;</span>
+<span class="nc bnc" id="L292" title="All 4 branches missed.">      if (o == null || getClass() != o.getClass())</span>
+<span class="nc" id="L293">        return false;</span>
+
+<span class="nc" id="L295">      Decimal decimal = (Decimal) o;</span>
+
+<span class="nc bnc" id="L297" title="All 2 branches missed.">      if (precision != decimal.precision)</span>
+<span class="nc" id="L298">        return false;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">      return scale == decimal.scale;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L304">      int result = precision;</span>
+<span class="nc" id="L305">      result = 31 * result + scale;</span>
+<span class="nc" id="L306">      return result;</span>
+    }
+  }
+
+  /** Date represents a date without a time */
+  public static class Date extends LogicalType {
+    private Date() {
+<span class="nc" id="L313">      super(DATE);</span>
+<span class="nc" id="L314">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L318">      super.validate(schema);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.INT) {</span>
+<span class="nc" id="L320">        throw new IllegalArgumentException(&quot;Date can only be used with an underlying int type&quot;);</span>
+      }
+<span class="nc" id="L322">    }</span>
+  }
+
+  /** TimeMillis represents a time in milliseconds without a date */
+  public static class TimeMillis extends LogicalType {
+    private TimeMillis() {
+<span class="nc" id="L328">      super(TIME_MILLIS);</span>
+<span class="nc" id="L329">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L333">      super.validate(schema);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.INT) {</span>
+<span class="nc" id="L335">        throw new IllegalArgumentException(&quot;Time (millis) can only be used with an underlying int type&quot;);</span>
+      }
+<span class="nc" id="L337">    }</span>
+  }
+
+  /** TimeMicros represents a time in microseconds without a date */
+  public static class TimeMicros extends LogicalType {
+    private TimeMicros() {
+<span class="nc" id="L343">      super(TIME_MICROS);</span>
+<span class="nc" id="L344">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L348">      super.validate(schema);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.LONG) {</span>
+<span class="nc" id="L350">        throw new IllegalArgumentException(&quot;Time (micros) can only be used with an underlying long type&quot;);</span>
+      }
+<span class="nc" id="L352">    }</span>
+  }
+
+  /** TimestampMillis represents a date and time in milliseconds */
+  public static class TimestampMillis extends LogicalType {
+    private TimestampMillis() {
+<span class="nc" id="L358">      super(TIMESTAMP_MILLIS);</span>
+<span class="nc" id="L359">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L363">      super.validate(schema);</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.LONG) {</span>
+<span class="nc" id="L365">        throw new IllegalArgumentException(&quot;Timestamp (millis) can only be used with an underlying long type&quot;);</span>
+      }
+<span class="nc" id="L367">    }</span>
+  }
+
+  /** TimestampMicros represents a date and time in microseconds */
+  public static class TimestampMicros extends LogicalType {
+    private TimestampMicros() {
+<span class="nc" id="L373">      super(TIMESTAMP_MICROS);</span>
+<span class="nc" id="L374">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L378">      super.validate(schema);</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.LONG) {</span>
+<span class="nc" id="L380">        throw new IllegalArgumentException(&quot;Timestamp (micros) can only be used with an underlying long type&quot;);</span>
+      }
+<span class="nc" id="L382">    }</span>
+  }
+
+  public static class LocalTimestampMillis extends LogicalType {
+    private LocalTimestampMillis() {
+<span class="nc" id="L387">      super(LOCAL_TIMESTAMP_MILLIS);</span>
+<span class="nc" id="L388">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L392">      super.validate(schema);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.LONG) {</span>
+<span class="nc" id="L394">        throw new IllegalArgumentException(&quot;Local timestamp (millis) can only be used with an underlying long type&quot;);</span>
+      }
+<span class="nc" id="L396">    }</span>
+  }
+
+  public static class LocalTimestampMicros extends LogicalType {
+    private LocalTimestampMicros() {
+<span class="nc" id="L401">      super(LOCAL_TIMESTAMP_MICROS);</span>
+<span class="nc" id="L402">    }</span>
+
+    @Override
+    public void validate(Schema schema) {
+<span class="nc" id="L406">      super.validate(schema);</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">      if (schema.getType() != Schema.Type.LONG) {</span>
+<span class="nc" id="L408">        throw new IllegalArgumentException(&quot;Local timestamp (micros) can only be used with an underlying long type&quot;);</span>
+      }
+<span class="nc" id="L410">    }</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

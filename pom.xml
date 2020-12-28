@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       https://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.apache</groupId>
+    <artifactId>apache</artifactId>
+    <version>23</version>
+  </parent>
+
+  <groupId>org.apache.avro</groupId>
+  <artifactId>avro-toplevel</artifactId>
+  <version>1.11.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>Apache Avro Toplevel</name>
+  <url>https://avro.apache.org</url>
+  <description>Avro toplevel pom</description>
+
+  <!-- This project is used for top level build tasks and artifact copying.
+       The RAT task is run to validate licenses.  The Enforcer plugin is used
+       to validate that java projects are the correct version.
+       Java artifacts are copied to the final build destination with a custom profile.
+       -->
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <main.basedir>${project.basedir}</main.basedir>
+    <avro.distDir>dist</avro.distDir>
+    <avro.docDir>build/avro-doc-${project.version}/api</avro.docDir>
+    <!-- dependency plugin versions -->
+    <apache-rat-tasks.version>0.7</apache-rat-tasks.version>
+
+    <!-- plugin versions -->
+    <antrun-plugin.version>3.0.0</antrun-plugin.version>
+    <checkstyle-plugin.version>3.1.1</checkstyle-plugin.version>
+    <enforcer-plugin.version>3.0.0-M3</enforcer-plugin.version>
+    <extra-enforcer-rules.version>1.2</extra-enforcer-rules.version>
+    <gpg-plugin.version>1.6</gpg-plugin.version>
+    <javadoc-plugin.version>3.2.0</javadoc-plugin.version>
+    <maven-plugin-plugin.version>3.6.0</maven-plugin-plugin.version>
+    <rat.version>0.13</rat.version>
+    <source-plugin.version>3.2.1</source-plugin.version>
+    <spotless-maven-plugin.version>1.31.1</spotless-maven-plugin.version>
+  </properties>
+
+  <modules>
+    <module>lang/java</module>
+  </modules>
+
+  <scm>
+    <connection>scm:git:https://github.com/apache/avro</connection>
+    <developerConnection>scm:git:https://github.com/apache/avro</developerConnection>
+    <url>scm:git:https://github.com/apache/avro</url>
+  </scm>
+
+  <issueManagement>
+    <system>jira</system>
+    <url>https://issues.apache.org/jira/browse/AVRO</url>
+  </issueManagement>
+
+  <inceptionYear>2009</inceptionYear>
+
+  <mailingLists>
+    <mailingList>
+      <name>Avro Developer List</name>
+      <subscribe>dev-subscribe@avro.apache.org</subscribe>
+      <unsubscribe>dev-unsubscribe@avro.apache.org</unsubscribe>
+      <post>dev@avro.apache.org</post>
+      <archive>https://mail-archives.apache.org/mod_mbox/avro-dev/</archive>
+    </mailingList>
+    <mailingList>
+      <name>Avro Users List</name>
+      <subscribe>users-subscribe@avro.apache.org</subscribe>
+      <unsubscribe>users-unsubscribe@avro.apache.org</unsubscribe>
+      <post>users@avro.apache.org</post>
+      <archive>https://mail-archives.apache.org/mod_mbox/avro-users/</archive>
+    </mailingList>
+    <mailingList>
+      <name>Avro Commits List</name>
+      <subscribe>commits-subscribe@avro.apache.org</subscribe>
+      <unsubscribe>commits-unsubscribe@avro.apache.org</unsubscribe>
+      <post>commits@avro.apache.org</post>
+      <archive>https://mail-archives.apache.org/mod_mbox/avro-commits/</archive>
+    </mailingList>
+  </mailingLists>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-maven-version</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>[3.3.9,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+          <execution>
+            <id>enforce</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireProperty>
+                  <property>project.version</property>
+                  <regex>${env.VERSION}</regex>
+                  <regexMessage>*****!!!!! Version of project must be ${env.VERSION} !!!!!*****</regexMessage>
+                </requireProperty>
+                <enforceBytecodeVersion>
+                  <maxJdkVersion>1.8</maxJdkVersion>
+                </enforceBytecodeVersion>
+                <requireJavaVersion>
+                  <version>[1.8,)</version>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+          <execution>
+            <id>enforce-banned-dependencies</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>com.google.code.findbugs:*</exclude>  <!-- GPL -->
+                    <exclude>org.hamcrest:hamcrest-all</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+        <dependencies>
+          <dependency>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>extra-enforcer-rules</artifactId>
+            <version>${extra-enforcer-rules.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <artifactId>maven-plugin-plugin</artifactId>
+        <version>${maven-plugin-plugin.version}</version>
+        <configuration>
+          <goalPrefix>avro</goalPrefix>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
